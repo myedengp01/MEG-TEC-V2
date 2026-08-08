@@ -890,7 +890,7 @@ function createPage(){
       <span class="tec-page-course-badge"></span>
       <button type="button" class="tec-page-remove" title="Remove this page">✕</button>
     </div>
-    <iframe class="tec-page-frame" src="pages/page-template.html"></iframe>
+    <iframe class="tec-page-frame" src="pages/page-template.html?v=${encodeURIComponent(VERSION)}"></iframe>
   `;
   document.getElementById('pagesContainer').appendChild(wrap);
   const page = { id, wrap, iframe: wrap.querySelector('iframe'), loaded: false };
