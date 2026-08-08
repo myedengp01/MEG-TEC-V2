@@ -1075,31 +1075,21 @@ function computeCourseGroups(){
   const groupPages = {};
   ordered.forEach(p => {
     const c = getPageCourse(p) || '';
-    if(!serialByCourse[c]) serialByCourse[c] = generateSerialForCourse(extractCourseCode(c));
+    if(!serialByCourse[c]) serialByCourse[c] = generateSerialForCourse(lookupCourseCode(c));
     if(!groupPages[c]) groupPages[c] = [];
     groupPages[c].push(p);
   });
   return { ordered, serialByCourse, groupPages };
 }
 
-// Derives a short serial-safe code from an admin-assigned course name:
-//   "Bahasa Melayu (BM)" -> "BM"     (text inside trailing brackets, if 1-3 chars)
-//   "Chess"               -> "CHESS" (no brackets at all -> use the whole name)
-//   "Bahasa Melayu ()"    -> "BAH"   (brackets present but empty/too long -> first 3 chars of the name)
-//   "Chess (Chessss)"     -> "CHE"   (same fallback — a mistakenly long bracket never produces an oversized serial)
-function extractCourseCode(courseName){
+// Looks up the admin-assigned serial code for a course name directly from the
+// managed course list — no parsing, no guessing. Falls back to the course
+// name itself only if a course somehow has no code set (shouldn't normally
+// happen, since adding a course now requires one).
+function lookupCourseCode(courseName){
   if(!courseName) return '';
-  const trimmed = courseName.trim();
-  const match = trimmed.match(/\(([^)]*)\)\s*$/);
-  if(match){
-    const bracketContent = match[1].trim();
-    if(bracketContent.length > 0 && bracketContent.length <= 3){
-      return bracketContent.toUpperCase();
-    }
-    const nameWithoutBrackets = trimmed.replace(/\([^)]*\)\s*$/, '').trim();
-    return nameWithoutBrackets.slice(0, 3).toUpperCase();
-  }
-  return trimmed.toUpperCase();
+  const match = (cachedTecCourses || []).find(c => c.name === courseName);
+  return (match && match.code) ? match.code : courseName;
 }
 
 function generateSerialForCourse(courseCode){
@@ -1254,7 +1244,7 @@ let cachedTecCourses = null;
 let cachedTecStandards = null;
 async function loadTecLists(){
   const [{ data: courses }, { data: standards }] = await Promise.all([
-    sb.from('tec_v2_courses').select('name').order('name'),
+    sb.from('tec_v2_courses').select('name, code').order('name'),
     sb.from('tec_v2_standards').select('name').order('sort_order')
   ]);
   cachedTecCourses = courses || [];
@@ -1488,22 +1478,44 @@ async function renderCoursesTab(){
   if(error){ cont.innerHTML = '<div class="manage-empty">Failed to load courses.</div>'; return; }
   cont.innerHTML = `
     <div class="manage-add-row">
-      <input type="text" id="newCourseName" placeholder="New course name (e.g. Bahasa Melayu)">
+      <input type="text" id="newCourseName" placeholder="Course name (e.g. Bahasa Melayu)">
+      <input type="text" id="newCourseCode" placeholder="Serial code (e.g. BM)" maxlength="10" style="max-width:120px;">
       <button onclick="addTecCourse()">+ Add</button>
     </div>
+    <div class="manage-empty" style="padding:4px 10px 10px;">Serial code is used directly in the claim's serial number — keep it short. Courses sharing the same code will share one serial when submitted together.</div>
     <div id="manageListItems"></div>`;
   const itemsEl = document.getElementById('manageListItems');
   itemsEl.innerHTML = (data && data.length)
-    ? data.map(c => `<div class="manage-list-item"><span>${escapeHtmlTec(c.name)}</span><button class="manage-delete-btn" onclick="deleteTecCourse('${c.id}')">✕</button></div>`).join('')
+    ? data.map(c => `
+      <div class="manage-list-item">
+        <span>${escapeHtmlTec(c.name)} <span style="color:var(--muted);font-weight:700;">(${escapeHtmlTec(c.code || '—')})</span></span>
+        <span style="display:flex;gap:2px;">
+          <button class="manage-edit-btn" title="Edit serial code" onclick="editTecCourseCode('${c.id}', ${escapeHtmlTec(JSON.stringify(c.code || ''))})">✏️</button>
+          <button class="manage-delete-btn" onclick="deleteTecCourse('${c.id}')">✕</button>
+        </span>
+      </div>`).join('')
     : '<div class="manage-empty">No courses yet.</div>';
 }
 async function addTecCourse(){
-  const input = document.getElementById('newCourseName');
-  const name = input.value.trim();
-  if(!name) return;
-  const { error } = await sb.from('tec_v2_courses').insert({ name, created_by: currentUser.id });
+  const nameInput = document.getElementById('newCourseName');
+  const codeInput = document.getElementById('newCourseCode');
+  const name = nameInput.value.trim();
+  const code = codeInput.value.trim().toUpperCase();
+  if(!name){ alert('Enter a course name.'); return; }
+  if(!code){ alert('Enter a short serial code for this course (e.g. BM).'); return; }
+  const { error } = await sb.from('tec_v2_courses').insert({ name, code, created_by: currentUser.id });
   if(error){ alert('Failed to add course: ' + error.message); return; }
-  input.value = '';
+  nameInput.value = ''; codeInput.value = '';
+  await renderCoursesTab();
+  await loadTecLists();
+}
+async function editTecCourseCode(id, currentCode){
+  const entered = prompt('Serial code for this course:', currentCode);
+  if(entered === null) return; // cancelled
+  const code = entered.trim().toUpperCase();
+  if(!code){ alert('Serial code cannot be empty.'); return; }
+  const { error } = await sb.from('tec_v2_courses').update({ code }).eq('id', id);
+  if(error){ alert('Failed to update code: ' + error.message); return; }
   await renderCoursesTab();
   await loadTecLists();
 }
