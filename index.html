@@ -6,9 +6,9 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <!-- Verified package: MEG-TEC-V2 v2026.08.08-11:00 -->
+  <!-- Verified package: MEG-TEC-V2 v2026.08.08-11:30 -->
   <meta name="description" content="MYEDEN monthly tuition and enrichment class payment form" />
-  <title>MEG-TEC-V2 v2026.08.08-11:00</title>
+  <title>MEG-TEC-V2 v2026.08.08-11:30</title>
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#124b82">
   <link rel="apple-touch-icon" href="icons/icon-180.png">
@@ -786,7 +786,7 @@
     <section class="toolbar" aria-label="Form actions">
       <div class="toolbar__title">
         <strong>MYEDEN Digital Payment Form</strong>
-        <span>Version <span id="toolbarVersion">MEG-TEC-V2 v2026.08.08-11:00</span> · Multi-page submission</span>
+        <span>Version <span id="toolbarVersion">MEG-TEC-V2 v2026.08.08-11:30</span> · Multi-page submission</span>
       </div>
       <label class="toolbar__field" for="teacherNameInput">
         Teacher's Name
@@ -831,7 +831,7 @@
       </div>
     </div>
     <div class="version-footer no-print">
-      <span>MYEDEN Digital Payment Form (V2) · <strong id="versionPreview">MEG-TEC-V2 v2026.08.08-11:00</strong></span>
+      <span>MYEDEN Digital Payment Form (V2) · <strong id="versionPreview">MEG-TEC-V2 v2026.08.08-11:30</strong></span>
     </div>
 
   </main>
@@ -1141,7 +1141,7 @@ function applyGroupingToPages(){
 }
 
 /* ===================== SUPABASE / AUTH / SUBMISSIONS (MEG-TEC-V2) ===================== */
-const VERSION = "MEG-TEC-V2 v2026.08.08-11:00";
+const VERSION = "MEG-TEC-V2 v2026.08.08-11:30";
 const SUPABASE_URL = "https://vzngfswtofegimfcoigx.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ6bmdmc3d0b2ZlZ2ltZmNvaWd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUyODA5MzUsImV4cCI6MjEwMDg1NjkzNX0.47rTrOjzNgxarCBYGapqajLw5v_yATbeKitiyP6a2Sg";
 let sb = null;
@@ -1164,6 +1164,7 @@ const FORM_CODE = "tec-v2";
 const EDGE_FN_URL = SUPABASE_URL + "/functions/v1/tec-v2-notify";
 
 let currentUser = null, currentProfile = null, currentPerm = null;
+let onAuthReadyCompleted = false;
 
 function showAuthBox(which){
   document.getElementById('authBoxLogin').style.display = which==='login' ? 'block':'none';
@@ -1242,7 +1243,7 @@ async function doSignUp(){
 }
 async function doSignOut(){
   await sb.auth.signOut();
-  currentUser = null; currentProfile = null; currentPerm = null;
+  currentUser = null; currentProfile = null; currentPerm = null; onAuthReadyCompleted = false;
   document.getElementById('authOverlay').style.display = 'flex';
   document.getElementById('topUserBar').style.display = 'none';
   clearAuthFields();
@@ -1289,17 +1290,27 @@ async function onAuthReady(){
   document.getElementById('topUserLabel').textContent =
     `Signed in as ${currentProfile?.full_name || currentUser.email}${currentPerm.is_admin ? ' (Admin)' : (currentPerm.can_approve ? ' (PIC)' : '')}`;
 
-  await loadTecLists();
-  setPageCount(1); // create the first page now that auth has succeeded
+  // Supabase's onAuthStateChange fires for more than just the initial sign-in
+  // (token refreshes included) — this block does real, potentially destructive
+  // one-time setup (creating the first page, auto-filling teacher name), so it
+  // must only ever run once per genuine sign-in, not on every re-fire.
+  if(!onAuthReadyCompleted){
+    onAuthReadyCompleted = true;
+    await loadTecLists();
+    setPageCount(1); // create the first page now that auth has succeeded
+
+    if(currentPerm.can_submit){
+      // Auto-fill Teacher's Name with the signed-in user's name, still editable —
+      // this is the orchestrator's own shared field now, broadcast to every page.
+      const teacherNameInput = document.getElementById('teacherNameInput');
+      if(currentProfile?.full_name && !teacherNameInput.value){
+        teacherNameInput.value = currentProfile.full_name;
+        pushTeacherNameToAllPages();
+      }
+    }
+  }
 
   if(currentPerm.can_submit){
-    // Auto-fill Teacher's Name with the signed-in user's name, still editable —
-    // this is the orchestrator's own shared field now, broadcast to every page.
-    const teacherNameInput = document.getElementById('teacherNameInput');
-    if(currentProfile?.full_name && !teacherNameInput.value){
-      teacherNameInput.value = currentProfile.full_name;
-      pushTeacherNameToAllPages();
-    }
     document.getElementById('submitBtn').style.display = 'inline-block';
   } else {
     document.getElementById('submitBtn').style.display = 'none';
