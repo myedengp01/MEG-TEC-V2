@@ -830,6 +830,7 @@
               <label for="serialNo">Serial No :</label>
               <input id="serialNo" type="text" readonly aria-label="Automatically generated serial number" />
             </div>
+            <div id="serialDebugInfo" style="display:none;background:#fff3cd;border:1px solid #d9a441;color:#5c4400;font-size:11px;padding:5px 8px;border-radius:5px;margin:-4px 0 8px;font-family:monospace;white-space:pre-wrap;"></div>
             <div class="field-row">
               <label for="paymentMode">Payment Mode :</label>
               <select id="paymentMode">
@@ -1400,7 +1401,31 @@
       // nothing).
       function generateSerial(courseName) {
         if (!courseName) return "";
-        const code = COURSE_CODE_LOOKUP[courseName] || courseName;
+        const foundCode = COURSE_CODE_LOOKUP[courseName];
+        const code = foundCode || courseName;
+        const debugEl = $("#serialDebugInfo");
+        if (code === courseName) {
+          // TEMPORARY DIAGNOSTIC — remove once the root cause of the
+          // full-name-fallback bug is confirmed and fixed for good.
+          // Triggers on the actual observable symptom (result equals the
+          // full course name) rather than only "lookup entry missing",
+          // since a lookup entry that itself resolves to the full name
+          // (e.g. an empty stored code) wouldn't trip a missing-entry check.
+          const keys = Object.keys(COURSE_CODE_LOOKUP);
+          if (debugEl) {
+            debugEl.style.display = "block";
+            debugEl.textContent =
+              `⚠ DEBUG (temporary): serial fell back to the full course name.\n` +
+              `Course: "${courseName}" (${courseName.length} chars)\n` +
+              `Lookup value for this course: ${JSON.stringify(foundCode)}\n` +
+              `COURSE_CODE_LOOKUP has ${keys.length} entr${keys.length === 1 ? "y" : "ies"}: ` +
+              (keys.length ? keys.map(k => `"${k}"=${JSON.stringify(COURSE_CODE_LOOKUP[k])}`).join(", ") : "(empty)");
+          }
+          console.warn("[TEC-V2 serial debug] Fell back to full name. Course:", JSON.stringify(courseName), "Lookup value:", JSON.stringify(foundCode), "Full lookup:", COURSE_CODE_LOOKUP);
+        } else if (debugEl) {
+          debugEl.style.display = "none";
+          debugEl.textContent = "";
+        }
         const now = new Date();
         return `${code}-${pad2(now.getDate())}${pad2(now.getMonth() + 1)}${now.getFullYear()}${pad2(now.getHours())}${pad2(now.getMinutes())}`;
       }
@@ -1516,6 +1541,22 @@
           const savedSerial = header.serialNo;
           const currentCode = COURSE_CODE_LOOKUP[$("#course").value] || $("#course").value;
           const savedSerialIsCurrent = savedSerial && savedSerial.split("-")[0] === currentCode;
+          // TEMPORARY DIAGNOSTIC — remove once the root cause of the
+          // full-name-fallback bug is confirmed and fixed for good.
+          const debugEl = $("#serialDebugInfo");
+          const wouldShowFullName = savedSerialIsCurrent
+            ? savedSerial.split("-")[0] === $("#course").value
+            : false; // if not current, generateSerial() below runs its own check
+          if (wouldShowFullName) {
+            console.warn("[TEC-V2 serial debug] Draft restoration KEPT a full-name serial as 'current' — savedSerial:", JSON.stringify(savedSerial), "course:", JSON.stringify($("#course").value), "currentCode used:", JSON.stringify(currentCode));
+            if (debugEl) {
+              debugEl.style.display = "block";
+              debugEl.textContent =
+                `⚠ DEBUG (temporary) — restoring a saved draft kept a full-name serial.\n` +
+                `Saved serial: "${savedSerial}"  |  Course: "${$("#course").value}"\n` +
+                `Code looked up: "${currentCode}"`;
+            }
+          }
           $("#serialNo").value = savedSerialIsCurrent ? savedSerial : generateSerial($("#course").value);
           $("#sameDates").checked = Boolean(header.sameDates);
           clearRows();
