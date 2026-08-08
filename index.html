@@ -6,9 +6,9 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <!-- Verified package: MEG-TEC-V2 v2026.08.08-12:30 -->
+  <!-- Verified package: MEG-TEC-V2 v2026.08.08-13:00 -->
   <meta name="description" content="MYEDEN monthly tuition and enrichment class payment form" />
-  <title>MEG-TEC-V2 v2026.08.08-12:30</title>
+  <title>MEG-TEC-V2 v2026.08.08-13:00</title>
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#124b82">
   <link rel="apple-touch-icon" href="icons/icon-180.png">
@@ -786,7 +786,7 @@
     <section class="toolbar" aria-label="Form actions">
       <div class="toolbar__title">
         <strong>MYEDEN Digital Payment Form</strong>
-        <span>Version <span id="toolbarVersion">MEG-TEC-V2 v2026.08.08-12:30</span> · Multi-page submission</span>
+        <span>Version <span id="toolbarVersion">MEG-TEC-V2 v2026.08.08-13:00</span> · Multi-page submission</span>
       </div>
       <label class="toolbar__field" for="teacherNameInput">
         Teacher's Name
@@ -831,7 +831,7 @@
       </div>
     </div>
     <div class="version-footer no-print">
-      <span>MYEDEN Digital Payment Form (V2) · <strong id="versionPreview">MEG-TEC-V2 v2026.08.08-12:30</strong></span>
+      <span>MYEDEN Digital Payment Form (V2) · <strong id="versionPreview">MEG-TEC-V2 v2026.08.08-13:00</strong></span>
     </div>
 
   </main>
@@ -925,6 +925,7 @@ function renumberPageTabs(){
   pages.forEach((p, i) => {
     p.wrap.querySelector('.tec-page-tab-label').textContent = `Page ${i + 1}`;
     p.wrap.querySelector('.tec-page-remove').disabled = pages.length <= 1;
+    p.wrap.style.order = i; // keeps visual order in sync with array order at all times
   });
 }
 
@@ -1038,8 +1039,12 @@ function reorderPagesByCourse(){
     const ca = getPageCourse(a) || '', cb = getPageCourse(b) || '';
     return firstSeenIndex[ca] - firstSeenIndex[cb];
   });
-  const container = document.getElementById('pagesContainer');
-  sorted.forEach(p => container.appendChild(p.wrap)); // moves existing nodes, does not reload iframes
+  // Reorder logically (pages array) — renumberPageTabs() below applies the
+  // matching CSS order to each page's wrapper, achieving the visual reorder
+  // without ever moving the actual DOM nodes. Moving an <iframe> element
+  // (even via a "harmless" appendChild to reposition among siblings)
+  // reliably triggers a full reload of that iframe's content in real
+  // browsers, wiping out everything the teacher had entered on every page.
   pages = sorted;
   renumberPageTabs();
 }
@@ -1131,7 +1136,7 @@ function applyGroupingToPages(){
 }
 
 /* ===================== SUPABASE / AUTH / SUBMISSIONS (MEG-TEC-V2) ===================== */
-const VERSION = "MEG-TEC-V2 v2026.08.08-12:30";
+const VERSION = "MEG-TEC-V2 v2026.08.08-13:00";
 const SUPABASE_URL = "https://vzngfswtofegimfcoigx.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ6bmdmc3d0b2ZlZ2ltZmNvaWd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUyODA5MzUsImV4cCI6MjEwMDg1NjkzNX0.47rTrOjzNgxarCBYGapqajLw5v_yATbeKitiyP6a2Sg";
 let sb = null;
