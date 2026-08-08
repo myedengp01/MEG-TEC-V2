@@ -1,0 +1,9 @@
+{
+  "name": "MEG-TEC-V2 — Tuition & Enrichment Payment (Multi-page)",
+  "short_name": "MEG-TEC-V2",
+  "start_url": "/MEG-TEC-V2/",
+  "scope": "/MEG-TEC-V2/",
+  "display": "standalone",
+  "background_color": "#0b2a4a",
+  "theme_color": "#0b2a4a"
+}
