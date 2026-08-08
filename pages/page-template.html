@@ -1508,7 +1508,15 @@
           ["teacherName", "timeFrom", "timeTo", "paymentMode", "standard", "defaultMonthlyFee", "venueRate", "printOrientation"].forEach(id => {
             if (header[id] !== undefined && $("#" + id)) $("#" + id).value = header[id];
           });
-          $("#serialNo").value = header.serialNo || generateSerial($("#course").value);
+          // Only trust a saved draft's serial if its code prefix still matches
+          // what the course's CURRENT admin-assigned code would produce —
+          // otherwise it predates a course-code correction (or an earlier bug)
+          // and gets regenerated fresh instead of perpetuating a stale value
+          // forever just because a draft happens to already exist.
+          const savedSerial = header.serialNo;
+          const currentCode = COURSE_CODE_LOOKUP[$("#course").value] || $("#course").value;
+          const savedSerialIsCurrent = savedSerial && savedSerial.split("-")[0] === currentCode;
+          $("#serialNo").value = savedSerialIsCurrent ? savedSerial : generateSerial($("#course").value);
           $("#sameDates").checked = Boolean(header.sameDates);
           clearRows();
           const students = (Array.isArray(data.students) ? data.students : []).filter(student => String(student?.name || "").trim());
