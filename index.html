@@ -6,9 +6,9 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <!-- Verified package: MEG-TEC-V2 v2026.08.09-10:30 -->
+  <!-- Verified package: MEG-TEC-V2 v2026.08.09-12:30 -->
   <meta name="description" content="MYEDEN monthly tuition and enrichment class payment form" />
-  <title>MEG-TEC-V2 v2026.08.09-10:30</title>
+  <title>MEG-TEC-V2 v2026.08.09-12:30</title>
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#124b82">
   <link rel="apple-touch-icon" href="icons/icon-180.png">
@@ -786,7 +786,7 @@
     <section class="toolbar" aria-label="Form actions">
       <div class="toolbar__title">
         <strong>MYEDEN Digital Payment Form</strong>
-        <span>Version <span id="toolbarVersion">MEG-TEC-V2 v2026.08.09-10:30</span> · Multi-page submission</span>
+        <span>Version <span id="toolbarVersion">MEG-TEC-V2 v2026.08.09-12:30</span> · Multi-page submission</span>
       </div>
       <label class="toolbar__field" for="teacherNameInput">
         Teacher's Name
@@ -812,6 +812,8 @@
       </label>
       <button class="btn btn--primary" type="button" id="printBtn">Print / PDF</button>
       <button class="btn btn--danger" type="button" id="resetBtn">Reset All Pages</button>
+      <button class="btn" type="button" id="loadTemplateBtn" style="display:none;">📂 Load Template</button>
+      <button class="btn" type="button" id="saveTemplateBtn" style="display:none;">💾 Save as Template</button>
       <button class="btn btn--primary" type="button" id="submitBtn" style="display:none;">✅ Submit to PIC</button>
       <button class="btn" type="button" id="btnManageLists" style="display:none;">📋 Manage Lists</button>
       <button class="btn" type="button" id="btnPicReview" style="display:none;">🔍 Review Submissions</button>
@@ -831,8 +833,47 @@
         </div>
       </div>
     </div>
+
+    <div class="grouping-prompt-overlay" id="templateLoginPromptOverlay">
+      <div class="grouping-prompt-box">
+        <h3 id="templateLoginPromptTitle">Template Profiles</h3>
+        <p id="templateLoginPromptText"></p>
+        <div class="grouping-prompt-actions" id="templateLoginPromptActionsExisting" style="display:none;">
+          <button type="button" class="btn-no" id="templateLoginCreateNewBtn">Create New</button>
+          <button type="button" class="btn-yes" id="templateLoginChooseBtn">Choose Template</button>
+        </div>
+        <div class="grouping-prompt-actions" id="templateLoginPromptActionsNone" style="display:none;">
+          <button type="button" class="btn-no" id="templateLoginSkipBtn">Not Now</button>
+          <button type="button" class="btn-yes" id="templateLoginCreateFirstBtn">Create New Template</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="grouping-prompt-overlay" id="templatePickerOverlay">
+      <div class="grouping-prompt-box" style="max-width:560px;width:92%;">
+        <h3>Choose a Template</h3>
+        <p>Selecting a template sets the page count and each page's course + standards to match. Student names, fees, and dates are not included — those still come from typing fresh or Load Previous Month's Template.</p>
+        <div id="templatePickerList" style="max-height:340px;overflow-y:auto;margin:14px 0;"></div>
+        <div class="grouping-prompt-actions">
+          <button type="button" class="btn-no" id="templatePickerCancelBtn">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="grouping-prompt-overlay" id="saveTemplateOverlay">
+      <div class="grouping-prompt-box">
+        <h3>Save as Template</h3>
+        <p>Saves the current pages' courses and standards as a reusable layout — not student names, fees, or dates.</p>
+        <input type="text" id="saveTemplateNameInput" placeholder="Template name (e.g. Term 3 Roster)" style="width:100%;padding:8px 10px;border:1px solid #c8d4e0;border-radius:6px;margin-bottom:14px;box-sizing:border-box;">
+        <div class="grouping-prompt-actions">
+          <button type="button" class="btn-no" id="saveTemplateCancelBtn">Cancel</button>
+          <button type="button" class="btn-yes" id="saveTemplateConfirmBtn">Save</button>
+        </div>
+      </div>
+    </div>
+
     <div class="version-footer no-print">
-      <span>MYEDEN Digital Payment Form (V2) · <strong id="versionPreview">MEG-TEC-V2 v2026.08.09-10:30</strong></span>
+      <span>MYEDEN Digital Payment Form (V2) · <strong id="versionPreview">MEG-TEC-V2 v2026.08.09-12:30</strong></span>
     </div>
 
   </main>
@@ -1058,8 +1099,224 @@ document.getElementById('groupingPromptNo').addEventListener('click', () => {
   document.getElementById('groupingPromptOverlay').style.display = 'none';
 });
 
+// ---------- Template Profiles ----------
+// A "template" is a full saved SNAPSHOT of a multi-page submission —
+// students, fees, standards, time duration, everything except dates
+// (which are month-specific and deliberately excluded, matching how
+// "Load Previous Month's Template" already works). Lets a teacher
+// reload a known class roster wholesale instead of retyping it.
+let cachedTemplatesForPicker = [];
+let currentTemplateId = null;       // set when a template is applied this session
+let currentTemplateSnapshot = null; // the template's own pages data, for change detection at submit time
+
+async function fetchUserTemplates(){
+  const { data, error } = await sb.from('tec_v2_templates')
+    .select('*')
+    .eq('created_by', currentUser.id)
+    .order('created_at', { ascending: false });
+  if(error){ console.error('Failed to load templates:', error); return []; }
+  return data || [];
+}
+
+function formatTemplateContents(template){
+  return (template.pages || [])
+    .map(p => `${p.course_name}(${(p.standards || []).join(',')})`)
+    .join(', ');
+}
+
+function showTemplatePicker(templates){
+  const listEl = document.getElementById('templatePickerList');
+  listEl.innerHTML = templates.length === 0
+    ? '<div class="manage-empty">No templates saved yet.</div>'
+    : templates.map(t => `
+      <div class="manage-list-item" style="cursor:pointer;flex-direction:column;align-items:flex-start;gap:4px;padding:10px 12px;" onclick="selectTemplate('${t.id}')">
+        <strong>${escapeHtmlTec(t.name)}</strong>
+        <span style="color:var(--muted);font-size:12.5px;">${escapeHtmlTec(formatTemplateContents(t))}</span>
+      </div>`).join('');
+  document.getElementById('templatePickerOverlay').style.display = 'flex';
+}
+
+async function openTemplatePicker(){
+  cachedTemplatesForPicker = await fetchUserTemplates();
+  showTemplatePicker(cachedTemplatesForPicker);
+}
+
+async function selectTemplate(templateId){
+  const template = cachedTemplatesForPicker.find(t => t.id === templateId);
+  if(!template) return;
+  document.getElementById('templatePickerOverlay').style.display = 'none';
+  await applyTemplate(template);
+}
+
+// Applies a template's full snapshot (course, standards, time, students —
+// no dates) to each page. Tracks which template was applied and its
+// original data, so submit time can detect whether anything changed.
+async function applyTemplate(template){
+  const pagesData = template.pages || [];
+  setPageCount(Math.max(1, pagesData.length));
+  await Promise.all(pages.map(p => p.loaded ? Promise.resolve() : new Promise(resolve => {
+    p.iframe.addEventListener('load', resolve, { once: true });
+  })));
+  pages.forEach((page, i) => {
+    const pd = pagesData[i];
+    if(!pd) return;
+    const doc = getPageDoc(page);
+    const win = page.iframe.contentWindow;
+    if(!doc || !win) return;
+    const courseSelect = doc.getElementById('course');
+    if(courseSelect){
+      courseSelect.value = pd.course_name;
+      courseSelect.dispatchEvent(new Event('change'));
+    }
+    doc.querySelectorAll('#standardCheckboxes input').forEach(cb => {
+      cb.checked = (pd.standards || []).includes(cb.value);
+    });
+    const timeFromEl = doc.getElementById('timeFrom');
+    const timeToEl = doc.getElementById('timeTo');
+    if(timeFromEl && pd.time_from) timeFromEl.value = pd.time_from;
+    if(timeToEl && pd.time_to) timeToEl.value = pd.time_to;
+    if(win.TEC_applyStudentsTemplate) win.TEC_applyStudentsTemplate(pd.students || []);
+    updatePageTabBadge(page);
+  });
+  currentTemplateId = template.id;
+  currentTemplateSnapshot = pagesData;
+  groupingPromptShown = false;
+  checkCourseGrouping();
+}
+
+function pageHasAnyData(){
+  return pages.some(page => {
+    const doc = getPageDoc(page);
+    return Boolean(doc?.getElementById('course')?.value);
+  });
+}
+
+// Captures the current live pages into the same shape a template stores —
+// reused for both "Save as Template" and submit-time change detection.
+function captureCurrentPagesSnapshot(){
+  return pages.map(page => {
+    const doc = getPageDoc(page);
+    const win = page.iframe.contentWindow;
+    const course = doc?.getElementById('course')?.value || '';
+    const standards = doc ? [...doc.querySelectorAll('#standardCheckboxes input:checked')].map(cb => cb.value) : [];
+    const timeFrom = doc?.getElementById('timeFrom')?.value || '';
+    const timeTo = doc?.getElementById('timeTo')?.value || '';
+    const formData = win?.TEC_getFormData ? win.TEC_getFormData() : { students: [] };
+    const students = (formData.students || []).map(s => ({
+      name: s.name, monthlyFee: s.monthlyFee, venueFee: s.venueFee
+    })); // deliberately no dates — month-specific, matching Load Previous Month's Template
+    return { course_name: course, standards, time_from: timeFrom, time_to: timeTo, students };
+  }).filter(p => p.course_name);
+}
+
+document.getElementById('loadTemplateBtn').addEventListener('click', async () => {
+  if(pageHasAnyData()){
+    if(!confirm("Loading a template will replace your current pages' data. Continue?")) return;
+  }
+  await openTemplatePicker();
+});
+document.getElementById('templatePickerCancelBtn').addEventListener('click', () => {
+  document.getElementById('templatePickerOverlay').style.display = 'none';
+});
+
+document.getElementById('saveTemplateBtn').addEventListener('click', () => {
+  document.getElementById('saveTemplateNameInput').value = '';
+  document.getElementById('saveTemplateOverlay').style.display = 'flex';
+});
+document.getElementById('saveTemplateCancelBtn').addEventListener('click', () => {
+  document.getElementById('saveTemplateOverlay').style.display = 'none';
+});
+document.getElementById('saveTemplateConfirmBtn').addEventListener('click', async () => {
+  const name = document.getElementById('saveTemplateNameInput').value.trim();
+  if(!name){ alert('Enter a name for this template.'); return; }
+  const pagesData = captureCurrentPagesSnapshot();
+  if(pagesData.length === 0){ alert('Select at least one course before saving a template.'); return; }
+  const { data, error } = await sb.from('tec_v2_templates')
+    .insert({ created_by: currentUser.id, name, pages: pagesData })
+    .select().single();
+  if(error){ alert('Failed to save template: ' + error.message); return; }
+  document.getElementById('saveTemplateOverlay').style.display = 'none';
+  currentTemplateId = data.id;
+  currentTemplateSnapshot = pagesData;
+  alert(`Template "${name}" saved.`);
+});
+
+// Login-time prompt — offered once per sign-in, before any page is created.
+async function checkAndPromptTemplates(){
+  const templates = await fetchUserTemplates();
+  cachedTemplatesForPicker = templates;
+  const overlay = document.getElementById('templateLoginPromptOverlay');
+  const text = document.getElementById('templateLoginPromptText');
+  const actionsExisting = document.getElementById('templateLoginPromptActionsExisting');
+  const actionsNone = document.getElementById('templateLoginPromptActionsNone');
+  if(templates.length === 0){
+    text.textContent = "You don't have any template created yet, would you like to create a new template?";
+    actionsExisting.style.display = 'none';
+    actionsNone.style.display = 'flex';
+  } else {
+    text.textContent = `You have (${templates.length}) template${templates.length === 1 ? '' : 's'} existed in database, would you like to choose one or proceed with a new one?`;
+    actionsExisting.style.display = 'flex';
+    actionsNone.style.display = 'none';
+  }
+  overlay.style.display = 'flex';
+}
+document.getElementById('templateLoginChooseBtn').addEventListener('click', () => {
+  document.getElementById('templateLoginPromptOverlay').style.display = 'none';
+  showTemplatePicker(cachedTemplatesForPicker);
+});
+document.getElementById('templateLoginCreateNewBtn').addEventListener('click', () => {
+  document.getElementById('templateLoginPromptOverlay').style.display = 'none';
+  setPageCount(1);
+});
+document.getElementById('templateLoginSkipBtn').addEventListener('click', () => {
+  document.getElementById('templateLoginPromptOverlay').style.display = 'none';
+  setPageCount(1);
+});
+document.getElementById('templateLoginCreateFirstBtn').addEventListener('click', () => {
+  document.getElementById('templateLoginPromptOverlay').style.display = 'none';
+  setPageCount(1);
+  alert('Set up your pages the way you want, then click "Save as Template" in the toolbar to save this layout for next time.');
+});
+
+// Submit-time "update or maintain" check — only relevant if a template was
+// used to populate this session's pages, and only checked at final
+// submission (not autosave, not draft).
+function templateSnapshotsDiffer(a, b){
+  return JSON.stringify(a) !== JSON.stringify(b);
+}
+async function maybeOfferTemplateUpdate(){
+  if(!currentTemplateId || !currentTemplateSnapshot) return;
+  const nowSnapshot = captureCurrentPagesSnapshot();
+  if(!templateSnapshotsDiffer(currentTemplateSnapshot, nowSnapshot)) return; // nothing changed
+  const wantsUpdate = confirm(
+    "You have added new / removed / changed records compared to the template you loaded.\n\n" +
+    "Press OK to UPDATE the template with these changes, or Cancel to MAINTAIN the template as it was."
+  );
+  if(wantsUpdate){
+    const { error } = await sb.from('tec_v2_templates')
+      .update({ pages: nowSnapshot, updated_at: new Date().toISOString() })
+      .eq('id', currentTemplateId);
+    if(error){ alert('Failed to update template: ' + error.message); return; }
+    currentTemplateSnapshot = nowSnapshot;
+  }
+  // "Maintain" needs no action — the template row is simply left untouched.
+}
+
 document.getElementById('pageCountInput').addEventListener('change', (e) => {
   setPageCount(parseInt(e.target.value, 10));
+});
+
+document.getElementById('resetBtn').addEventListener('click', () => {
+  if(!confirm('Reset all pages? This clears every page back to one blank page — courses, students, and everything else entered will be lost.')) return;
+  currentTemplateId = null;
+  currentTemplateSnapshot = null;
+  // Remove every existing page (bypassing removePageById's "keep at least
+  // 1" guard, since this action explicitly wants a genuinely fresh start)
+  // and create one brand new page — a fresh iframe load guarantees a truly
+  // blank state in a way clearing an existing page's DOM by hand wouldn't.
+  pages.forEach(p => p.wrap.remove());
+  pages = [];
+  createPage();
 });
 
 // Computes course-grouped ordering (independent of on-screen order — this is
@@ -1137,7 +1394,7 @@ function applyGroupingToPages(){
 }
 
 /* ===================== SUPABASE / AUTH / SUBMISSIONS (MEG-TEC-V2) ===================== */
-const VERSION = "MEG-TEC-V2 v2026.08.09-10:30";
+const VERSION = "MEG-TEC-V2 v2026.08.09-12:30";
 const SUPABASE_URL = "https://vzngfswtofegimfcoigx.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ6bmdmc3d0b2ZlZ2ltZmNvaWd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUyODA5MzUsImV4cCI6MjEwMDg1NjkzNX0.47rTrOjzNgxarCBYGapqajLw5v_yATbeKitiyP6a2Sg";
 let sb = null;
@@ -1310,7 +1567,6 @@ async function onAuthReady(){
   if(!onAuthReadyCompleted){
     onAuthReadyCompleted = true;
     await loadTecLists();
-    setPageCount(1); // create the first page now that auth has succeeded
 
     if(currentPerm.can_submit){
       // Auto-fill Teacher's Name with the signed-in user's name, still editable —
@@ -1320,13 +1576,23 @@ async function onAuthReady(){
         teacherNameInput.value = currentProfile.full_name;
         pushTeacherNameToAllPages();
       }
+      // Template Profiles are a convenience for people actually filling out
+      // pages — a pure PIC reviewer without submit permission never needs
+      // this prompt, so they just get the plain single blank page as before.
+      await checkAndPromptTemplates();
+    } else {
+      setPageCount(1); // create the first page now that auth has succeeded
     }
   }
 
   if(currentPerm.can_submit){
     document.getElementById('submitBtn').style.display = 'inline-block';
+    document.getElementById('loadTemplateBtn').style.display = 'inline-block';
+    document.getElementById('saveTemplateBtn').style.display = 'inline-block';
   } else {
     document.getElementById('submitBtn').style.display = 'none';
+    document.getElementById('loadTemplateBtn').style.display = 'none';
+    document.getElementById('saveTemplateBtn').style.display = 'none';
   }
 
   if(currentPerm.is_admin){
@@ -1425,6 +1691,8 @@ async function submitTecForm(){
 
   const { data, error } = await sb.from('tec_v2_submissions').insert(payload).select().single();
   if(error){ alert('Failed to submit: ' + error.message); return; }
+
+  await maybeOfferTemplateUpdate();
 
   notifyTecEdgeFunction('submitted', data.id);
   const serials = [...new Set(pagesPayload.map(p => p.serial_no))].join(', ');
