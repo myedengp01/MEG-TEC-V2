@@ -6,9 +6,9 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <!-- Verified package: MEG-TEC-V2 v2026.08.09-10:00 -->
+  <!-- Verified package: MEG-TEC-V2 v2026.08.09-10:15 -->
   <meta name="description" content="MYEDEN monthly tuition and enrichment class payment form" />
-  <title>MEG-TEC-V2 v2026.08.09-10:00</title>
+  <title>MEG-TEC-V2 v2026.08.09-10:15</title>
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#124b82">
   <link rel="apple-touch-icon" href="icons/icon-180.png">
@@ -786,7 +786,7 @@
     <section class="toolbar" aria-label="Form actions">
       <div class="toolbar__title">
         <strong>MYEDEN Digital Payment Form</strong>
-        <span>Version <span id="toolbarVersion">MEG-TEC-V2 v2026.08.09-10:00</span> · Multi-page submission</span>
+        <span>Version <span id="toolbarVersion">MEG-TEC-V2 v2026.08.09-10:15</span> · Multi-page submission</span>
       </div>
       <label class="toolbar__field" for="teacherNameInput">
         Teacher's Name
@@ -819,6 +819,7 @@
       <div class="status" id="status" role="status" aria-live="polite"></div>
     </section>
 
+    <div id="rawCourseDebugInfo" style="display:none;background:#fff3cd;border:1px solid #d9a441;color:#5c4400;font-size:11px;padding:8px 12px;border-radius:6px;margin:0 0 12px;font-family:monospace;white-space:pre-wrap;"></div>
     <div id="pagesContainer"></div>
     <div class="grouping-prompt-overlay" id="groupingPromptOverlay">
       <div class="grouping-prompt-box">
@@ -831,7 +832,7 @@
       </div>
     </div>
     <div class="version-footer no-print">
-      <span>MYEDEN Digital Payment Form (V2) · <strong id="versionPreview">MEG-TEC-V2 v2026.08.09-10:00</strong></span>
+      <span>MYEDEN Digital Payment Form (V2) · <strong id="versionPreview">MEG-TEC-V2 v2026.08.09-10:15</strong></span>
     </div>
 
   </main>
@@ -1136,7 +1137,7 @@ function applyGroupingToPages(){
 }
 
 /* ===================== SUPABASE / AUTH / SUBMISSIONS (MEG-TEC-V2) ===================== */
-const VERSION = "MEG-TEC-V2 v2026.08.09-10:00";
+const VERSION = "MEG-TEC-V2 v2026.08.09-10:15";
 const SUPABASE_URL = "https://vzngfswtofegimfcoigx.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ6bmdmc3d0b2ZlZ2ltZmNvaWd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUyODA5MzUsImV4cCI6MjEwMDg1NjkzNX0.47rTrOjzNgxarCBYGapqajLw5v_yATbeKitiyP6a2Sg";
 let sb = null;
@@ -1248,10 +1249,27 @@ async function doSignOut(){
 let cachedTecCourses = null;
 let cachedTecStandards = null;
 async function loadTecLists(){
-  const [{ data: courses }, { data: standards }] = await Promise.all([
+  const [coursesResult, standardsResult] = await Promise.all([
     sb.from('tec_v2_courses').select('*').order('name'),
     sb.from('tec_v2_standards').select('name').order('sort_order')
   ]);
+  // TEMPORARY DIAGNOSTIC — remove once the root cause of the persisting
+  // full-name-fallback bug is confirmed and fixed for good. Shows the RAW,
+  // completely unprocessed Supabase response, before anything in this app
+  // touches it — isolates whether the problem is at the query/database
+  // level itself, or introduced somewhere after.
+  const debugEl = document.getElementById('rawCourseDebugInfo');
+  if (debugEl) {
+    debugEl.style.display = 'block';
+    debugEl.textContent =
+      `⚠ DEBUG (temporary) — RAW Supabase response for tec_v2_courses:\n` +
+      `Error: ${coursesResult.error ? JSON.stringify(coursesResult.error) : 'none'}\n` +
+      `Row count: ${(coursesResult.data || []).length}\n` +
+      (coursesResult.data || []).map(c => `  "${c.name}" -> code: ${JSON.stringify(c.code)}`).join('\n');
+  }
+  console.warn('[TEC-V2 courses debug] Raw query result:', coursesResult);
+  const courses = coursesResult.data;
+  const standards = standardsResult.data;
   cachedTecCourses = courses || [];
   cachedTecStandards = standards || [];
   pages.forEach(pushListsToPage);
