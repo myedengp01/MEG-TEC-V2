@@ -6,9 +6,9 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <!-- Verified package: MEG-TEC-V2 v2026.08.10-10:00 -->
+  <!-- Verified package: MEG-TEC-V2 v2026.08.10-11:30 -->
   <meta name="description" content="MYEDEN monthly tuition and enrichment class payment form" />
-  <title>MEG-TEC-V2 v2026.08.10-10:00</title>
+  <title>MEG-TEC-V2 v2026.08.10-11:30</title>
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#124b82">
   <link rel="apple-touch-icon" href="icons/icon-180.png">
@@ -584,58 +584,34 @@
     @media print {
       * { print-color-adjust: exact !important; -webkit-print-color-adjust: exact !important; }
       html, body { background: white !important; }
-      .app-shell { width: 100%; margin: 0; }
-      .toolbar, .settings-panel, .privacy-note, .schedule-bar, .col-action, .action-cell, .add-student-table-body, #topUserBar, .no-print { display: none !important; }
-      tr.output-empty { display: none !important; }
-      input::placeholder { color: transparent !important; opacity: 0 !important; }
-      .paper { box-shadow: none; border: 0; border-radius: 0; overflow: visible; }
-      .document-header { margin: 0; padding: 3.2mm 4mm 2.8mm; border-radius: 0; }
-      .document-title { font-size: 13.5pt; line-height: 1.05; }
-      .header-logo-badge { width: 10mm; height: 10mm; top: 2.5mm; left: 3mm; padding: .8mm; }
-      .year-line { gap: 2mm; margin-top: 1mm; }
-      .year-input { flex-basis: 22mm; width: 22mm !important; min-width: 22mm !important; }
-      .meta-grid { gap: 1.5mm 4mm; margin-top: 2.5mm; grid-template-columns: minmax(0, 1.55fr) minmax(55mm, .95fr); }
-      .meta-column { gap: 1.2mm; }
-      .field-row { grid-template-columns: 28mm 1fr; gap: 1.5mm; }
-      .field-row label { font-size: 7.5pt; }
-      .document-header input, .document-header select { padding: .8mm 1.3mm; min-height: 4.6mm; font-size: 7.4pt; }
-      .time-fields { gap: 1mm; font-size: 7.2pt; grid-template-columns: auto 1fr auto 1fr; }
-      .table-wrap { margin: 0; overflow: visible; border-width: .35mm; }
-      table { width: 100%; min-width: 0; font-size: 6.6pt; table-layout: fixed; }
-      thead { display: table-header-group; }
-      tfoot { display: table-row-group; }
-      tr { break-inside: avoid; page-break-inside: avoid; }
-      th, td { border-width: .25mm; }
-      thead th { padding: 1.1mm .45mm; font-size: 6.3pt; }
-      .cell-input, .day-select { min-height: 4.1mm; padding: .35mm .45mm; font-size: 6.4pt; }
-      .student-name { padding-left: 1mm; }
-      .day-kind { font-size: 6.1pt; padding: .3mm; }
-      .day-select { appearance: none; -webkit-appearance: none; }
-      .money-input { padding-right: .8mm; }
-      tfoot td { padding: 1.3mm 1mm; }
-      .total-label { font-size: 10.5pt; }
-      .document-footer { padding: 1.5mm 0 0; }
-      .note, .footer-row { font-size: 6.5pt; }
-      .footer-row { margin-top: 4mm; }
+      .app-shell { width: 100%; margin: 0; padding: 0; }
 
-      body.print-portrait .col-no { width: 6mm; }
-      body.print-portrait .col-name { width: 39mm; }
-      body.print-portrait .col-kind { width: 18mm; }
-      body.print-portrait .col-day { width: 4.8mm; }
-      body.print-portrait .col-money { width: 19mm; }
+      /* Hide every piece of orchestrator chrome — none of it is part of
+         the actual printable claim, only the toolbar/modals/status bar
+         used while filling the form out on screen. */
+      .toolbar, #topUserBar, .no-print,
+      .grouping-prompt-overlay { display: none !important; }
 
-      body.print-landscape .document-title { font-size: 15pt; }
-      body.print-landscape .meta-grid { grid-template-columns: minmax(0, 1.6fr) minmax(70mm, .85fr); }
-      body.print-landscape table { font-size: 7.2pt; }
-      body.print-landscape thead th { font-size: 7pt; }
-      body.print-landscape .cell-input,
-      body.print-landscape .day-select { font-size: 7pt; min-height: 4.5mm; }
-      body.print-landscape .col-no { width: 7mm; }
-      body.print-landscape .col-name { width: 54mm; }
-      body.print-landscape .col-kind { width: 23mm; }
-      body.print-landscape .col-day { width: 8mm; }
-      body.print-landscape .col-money { width: 24mm; }
+      /* Each page's on-screen tab bar (label + course badge + remove
+         button) is navigation chrome, not part of the printable form
+         itself — only the iframe's own content should print. */
+      .tec-page-tab { display: none !important; }
+
+      #pagesContainer { display: block; gap: 0; }
+      .tec-page-wrap {
+        border: none; border-radius: 0; box-shadow: none; background: none;
+        overflow: visible;
+        break-after: page; page-break-after: always;
+      }
+      .tec-page-wrap:last-child { break-after: auto; page-break-after: auto; }
+      .tec-page-frame {
+        width: 100%; border: none; display: block;
+        /* Height is set dynamically in JS right before printing, sized to
+           each iframe's actual content — a fixed CSS height here would
+           silently clip a page with more students than fits the default. */
+      }
     }
+
 
     /* ===================== Auth / platform chrome ===================== */
     .standard-checkbox-group{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;}
@@ -786,7 +762,7 @@
     <section class="toolbar" aria-label="Form actions">
       <div class="toolbar__title">
         <strong>MYEDEN Digital Payment Form</strong>
-        <span>Version <span id="toolbarVersion">MEG-TEC-V2 v2026.08.10-10:00</span> · Multi-page submission</span>
+        <span>Version <span id="toolbarVersion">MEG-TEC-V2 v2026.08.10-11:30</span> · Multi-page submission</span>
       </div>
       <label class="toolbar__field" for="teacherNameInput">
         Teacher's Name
@@ -872,7 +848,7 @@
     </div>
 
     <div class="version-footer no-print">
-      <span>MYEDEN Digital Payment Form (V2) · <strong id="versionPreview">MEG-TEC-V2 v2026.08.10-10:00</strong></span>
+      <span>MYEDEN Digital Payment Form (V2) · <strong id="versionPreview">MEG-TEC-V2 v2026.08.10-11:30</strong></span>
     </div>
 
   </main>
@@ -1318,6 +1294,51 @@ document.getElementById('resetBtn').addEventListener('click', () => {
   createPage();
 });
 
+document.getElementById('printBtn').addEventListener('click', () => {
+  // 1. Refresh every page's serial + grand-total display so what prints
+  //    always matches what would actually be submitted right now.
+  applyGroupingToPages();
+
+  // 2. Printing always outputs pages in course-grouped order, regardless
+  //    of the on-screen arrangement or what was chosen on the grouping
+  //    prompt — enforced here via CSS order, exactly like the grouping
+  //    prompt itself does, so the actual iframe DOM nodes are never moved
+  //    (moving them is what causes a real browser to silently reload an
+  //    iframe's content, wiping out everything on that page).
+  const { ordered } = computeCourseGroups();
+  const originalOrders = pages.map(p => p.wrap.style.order);
+  ordered.forEach((p, i) => { p.wrap.style.order = i; });
+
+  // 3. Auto-size each iframe to its own actual content height. Iframes
+  //    don't grow to fit their content by default, so a page with enough
+  //    students to exceed a fixed height would otherwise have its extra
+  //    rows silently clipped out of the printed output — a serious
+  //    problem for a payment claim specifically.
+  const originalHeights = pages.map(p => p.iframe.style.height);
+  pages.forEach(p => {
+    const doc = getPageDoc(p);
+    if(doc && doc.body){
+      const h = Math.max(doc.body.scrollHeight, doc.documentElement.scrollHeight);
+      p.iframe.style.height = h + 'px';
+    }
+  });
+
+  const restore = () => {
+    pages.forEach((p, i) => {
+      p.wrap.style.order = originalOrders[i];
+      p.iframe.style.height = originalHeights[i];
+    });
+    window.removeEventListener('afterprint', restore);
+  };
+  window.addEventListener('afterprint', restore);
+  // afterprint isn't perfectly reliable across every browser/print-dialog
+  // interaction, so this fallback guarantees the on-screen state always
+  // gets restored even if that event never fires.
+  setTimeout(restore, 5000);
+
+  window.print();
+});
+
 // Computes course-grouped ordering (independent of on-screen order — this is
 // what both printing and serial assignment use, per the confirmed rule that
 // printing always enforces course-grouped order regardless of the on-screen
@@ -1393,7 +1414,7 @@ function applyGroupingToPages(){
 }
 
 /* ===================== SUPABASE / AUTH / SUBMISSIONS (MEG-TEC-V2) ===================== */
-const VERSION = "MEG-TEC-V2 v2026.08.10-10:00";
+const VERSION = "MEG-TEC-V2 v2026.08.10-11:30";
 const SUPABASE_URL = "https://vzngfswtofegimfcoigx.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ6bmdmc3d0b2ZlZ2ltZmNvaWd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUyODA5MzUsImV4cCI6MjEwMDg1NjkzNX0.47rTrOjzNgxarCBYGapqajLw5v_yATbeKitiyP6a2Sg";
 let sb = null;
