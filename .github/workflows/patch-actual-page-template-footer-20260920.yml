@@ -1,0 +1,40 @@
+name: Patch actual TEC-V2 page template footer
+on:
+  push:
+    paths:
+      - '.github/workflows/patch-actual-page-template-footer-20260920.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Correct actual template source and remove footer-only timestamp
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p=Path('pages/page-template.html')
+          s=p.read_text(encoding='utf-8')
+          old='v2026.08.10-10:00'
+          new='v2026.09.20:13:30'
+          old_count=s.count(old)
+          if not old_count and new not in s:
+              raise SystemExit('Expected template version not found; refusing blind edit')
+          s=s.replace(old,new)
+          # Remove only the generated document footer timestamp, not claim dates or audit history.
+          s,n=re.subn(r'(?is)<(?:div|span|p|small)\b[^>]*>\s*Timestamp:\s*(?:\$\{[^}]+\}|[^<]{0,100})</(?:div|span|p|small)>','',s)
+          # Template may use a label and dynamic value without a wrapping element.
+          s,m=re.subn(r'(?i)(?:<br\s*/?>\s*)?Timestamp:\s*(?:\$\{[^}]+\}|20-09-2026-\d{2}:\d{2})','',s)
+          if old in s: raise SystemExit('Old version remains in template')
+          p.write_text(s,encoding='utf-8')
+          print(f'Template version replacements: {old_count}; footer timestamp removals: {n+m}')
+          PY
+      - name: Commit template to main for GitHub Pages
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add pages/page-template.html
+          if ! git diff --cached --quiet; then git commit -m 'fix: actual TEC-V2 page template footer UVN v2026.09.20:13:30' && git push; fi
