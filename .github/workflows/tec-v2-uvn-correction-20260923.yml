@@ -1,0 +1,38 @@
+name: TEC-V2 UVN correction 20260923
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/tec-v2-uvn-correction-20260923.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  uvn:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: true
+      - name: Synchronize TEC-V2 UVN without changing business logic
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          old='v2026.09.20:13:30'; new='v2026.09.22-20:00'
+          for filename in ['index.html','pages/page-template.html']:
+              p=Path(filename); s=p.read_text(encoding='utf-8')
+              assert old in s, f'{filename}: old UVN missing'
+              before_done=s.count('async function markTecSubmissionDone(id)')
+              s=s.replace(old,new)
+              assert old not in s
+              assert s.count('async function markTecSubmissionDone(id)')==before_done
+              p.write_text(s,encoding='utf-8')
+          Path('version.json').write_text(json.dumps({'version':new,'uvn':new},indent=2)+'\n',encoding='utf-8')
+          print('PASS: TEC-V2 UVN synchronized only')
+          PY
+          git diff --check
+          git add index.html pages/page-template.html version.json
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git diff --cached --quiet || (git commit -m 'chore(TEC-V2): synchronize UVN v2026.09.22-20:00' && git push origin main)
