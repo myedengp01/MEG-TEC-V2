@@ -1,0 +1,57 @@
+name: Release TEC-V2 Inline Claim Paid 20260922-2000
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/release-inline-payment-20260922-2000.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: true
+      - name: Guarded TEC-V2 integration
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          new='v2026.09.22-20:00'
+          for filename in ['index.html','pages/page-template.html']:
+            p=Path(filename);s=p.read_text(encoding='utf-8')
+            old='v2026.09.20:13:30'
+            assert old in s, f'{filename}: old UVN not found'
+            s=s.replace(old,new)
+            p.write_text(s,encoding='utf-8')
+          p=Path('index.html');s=p.read_text(encoding='utf-8')
+          assert s.count('async function renderPicReviewList()')==1
+          assert s.count('async function markTecSubmissionDone(id)')==1
+          anchor='''        <div class="pic-row-actions">
+          <a href="?review=${sub.id}" target="_blank" rel="noopener">🖨️ View &amp; Print</a>
+          ${doneAction}
+        </div>'''
+          assert s.count(anchor)==1, 'TEC-V2 review action anchor changed'
+          repl='''        <div class="pic-row-actions">
+          <a href="?review=${sub.id}" target="_blank" rel="noopener">🖨️ View &amp; Print</a>
+          ${doneAction}
+          <span data-meg-tecv2-payment-id="${sub.id}" style="display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;">Checking payment status…</span>
+        </div>'''
+          s=s.replace(anchor,repl,1)
+          assert s.count('</body>')>=1
+          head,tail=s.rsplit('</body>',1)
+          s=head+'<script src="./universal-payment-inline.js?v=20260922-2000" defer></script>\n</body>'+tail
+          assert s.count('data-meg-tecv2-payment-id=')==1
+          assert s.count('universal-payment-inline.js?v=20260922-2000')==1
+          p.write_text(s,encoding='utf-8')
+          Path('version.json').write_text(json.dumps({'version':new,'uvn':new},indent=2)+'\n',encoding='utf-8')
+          print('PASS TEC-V2: Mark as Done preserved, inline finance actions wired, UVN synchronized')
+          PY
+          node --check universal-payment-inline.js
+          git diff --check
+          git add index.html pages/page-template.html version.json universal-payment-inline.js
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git diff --cached --quiet || (git commit -m 'release(TEC-V2): inline Claim Paid and UVN v2026.09.22-20:00' && git push origin main)
